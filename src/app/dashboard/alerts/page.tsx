@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { ShieldAlert, Bell, MapPin, Wind, Droplets, Thermometer, ShieldCheck, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { SystemModal } from '@/components/ui/SystemModal';
 
 const ALERTS = [
   { id: 1, type: 'CYCLONE', name: 'Cyclone Amphan-26', severity: 'EXTREME', location: 'Coastal Odisha / Bengal', windSpeed: '185 km/h', eta: '4h 12m', status: 'EVACUATION_MANDATORY' },
@@ -11,7 +13,74 @@ const ALERTS = [
   { id: 3, type: 'HEATWAVE', name: 'Thermal Surge', severity: 'HIGH', location: 'North India Grid', temp: '48.5°C', eta: 'Ongoing', status: 'ADVISORY_ACTIVE' },
 ];
 
+const playTacticalAlert = (type: 'danger' | 'success') => {
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    const playTone = (freq: number, start: number, duration: number, wave: OscillatorType = 'sine') => {
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      oscillator.type = wave;
+      oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime + start);
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      gainNode.gain.setValueAtTime(0, audioCtx.currentTime + start);
+      gainNode.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + start + 0.05);
+      gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + start + duration);
+      oscillator.start(audioCtx.currentTime + start);
+      oscillator.stop(audioCtx.currentTime + start + duration);
+    };
+
+    if (type === 'danger') {
+      // Triple pulse alarm
+      playTone(880, 0, 0.3, 'square');
+      playTone(880, 0.4, 0.3, 'square');
+      playTone(880, 0.8, 0.5, 'square');
+    } else {
+      // Dual tone chime
+      playTone(1200, 0, 0.2, 'sine');
+      playTone(1600, 0.2, 0.4, 'sine');
+    }
+  } catch (e) {
+    console.error("Audio failed", e);
+  }
+};
+
 export default function AlertsPage() {
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'info' | 'danger' | 'success';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
+  const handleEvac = (name: string) => {
+    playTacticalAlert('danger');
+    setModalState({
+      isOpen: true,
+      title: "Evacuation Protocol",
+      message: `CRITICAL: Mandatory evacuation initiated for ${name}. All citizens directed to nearest Base Camp. Emergency services dispatched.`,
+      type: 'danger'
+    });
+  };
+
+  const handleMesh = (name: string) => {
+    playTacticalAlert('success');
+    setModalState({
+      isOpen: true,
+      title: "Mesh Expansion",
+      message: `SYSTEM: Deployment of high-intensity Mesh Relays confirmed for ${name}. Local network integrity increasing.`,
+      type: 'success'
+    });
+  };
+
+  const closeDiscard = () => setModalState(prev => ({ ...prev, isOpen: false }));
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <div className="flex items-end justify-between">
@@ -97,10 +166,16 @@ export default function AlertsPage() {
                     </div>
 
                     <div className="flex items-center gap-4 pt-4 border-t border-white/5">
-                      <button className="px-6 py-2 rounded bg-danger/20 border border-danger/40 text-[10px] font-black text-danger uppercase tracking-widest hover:bg-danger/30 transition-all cursor-pointer">
+                      <button 
+                        onClick={() => handleEvac(alert.name)}
+                        className="px-6 py-2 rounded bg-danger/20 border border-danger/40 text-[10px] font-black text-danger uppercase tracking-widest hover:bg-danger/30 transition-all cursor-pointer"
+                      >
                         Initiate Evacuation
                       </button>
-                      <button className="px-6 py-2 rounded bg-white/5 border border-white/10 text-[10px] font-black text-white/40 uppercase tracking-widest hover:bg-white/10 transition-all cursor-pointer">
+                      <button 
+                        onClick={() => handleMesh(alert.name)}
+                        className="px-6 py-2 rounded bg-white/5 border border-white/10 text-[10px] font-black text-white/40 uppercase tracking-widest hover:bg-white/10 transition-all cursor-pointer"
+                      >
                         Deploy Mesh Relays
                       </button>
                       <button className="ml-auto flex items-center gap-2 text-[10px] font-bold uppercase text-primary hover:underline cursor-pointer">
@@ -114,6 +189,14 @@ export default function AlertsPage() {
           </motion.div>
         ))}
       </div>
+
+      <SystemModal 
+        isOpen={modalState.isOpen}
+        onClose={closeDiscard}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+      />
     </div>
   );
 }

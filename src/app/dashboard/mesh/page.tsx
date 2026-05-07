@@ -6,6 +6,39 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { Send, Users, Terminal, Copy } from 'lucide-react';
 
+const playTacticalAlert = (type: 'danger' | 'success') => {
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    const playTone = (freq: number, start: number, duration: number, wave: OscillatorType = 'sine') => {
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      oscillator.type = wave;
+      oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime + start);
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      gainNode.gain.setValueAtTime(0, audioCtx.currentTime + start);
+      gainNode.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + start + 0.05);
+      gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + start + duration);
+      oscillator.start(audioCtx.currentTime + start);
+      oscillator.stop(audioCtx.currentTime + start + duration);
+    };
+
+    if (type === 'danger') {
+      // Triple pulse alarm
+      playTone(880, 0, 0.3, 'square');
+      playTone(880, 0.4, 0.3, 'square');
+      playTone(880, 0.8, 0.5, 'square');
+    } else {
+      // Dual tone chime
+      playTone(1200, 0, 0.2, 'sine');
+      playTone(1600, 0.2, 0.4, 'sine');
+    }
+  } catch (e) {
+    console.error("Audio failed", e);
+  }
+};
+
 export default function MeshPage() {
   const { peerId, connections, messages, sendMessage, connectToPeer, status } = useMesh();
   const [targetId, setTargetId] = useState('');
@@ -16,6 +49,7 @@ export default function MeshPage() {
     if (targetId) {
       connectToPeer(targetId);
       setTargetId('');
+      playTacticalAlert('success');
     }
   };
 
@@ -25,6 +59,11 @@ export default function MeshPage() {
       sendMessage(inputText);
       setInputText('');
     }
+  };
+
+  const handleSOS = () => {
+    playTacticalAlert('danger');
+    sendMessage("EMERGENCY SOS BROADCAST", "sos");
   };
 
   const copyId = () => {
@@ -93,7 +132,7 @@ export default function MeshPage() {
             </div>
           </GlassCard>
 
-          <NeonButton variant="danger" className="w-full cursor-pointer" onClick={() => sendMessage("EMERGENCY SOS BROADCAST", "sos")}>
+          <NeonButton variant="danger" className="w-full cursor-pointer" onClick={handleSOS}>
             Broadcast SOS
           </NeonButton>
         </div>
